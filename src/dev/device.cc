@@ -71,7 +71,7 @@ doca_error_t DOCADevice::OpenWithCap(jobs_check func) {
     return DOCA_ERROR_NOT_FOUND;
 }
 
-doca_error_t DOCADevice::AddMMap(const MemMap& mmap) {
+doca_error_t DOCADevice::AddMMap(MemMap& mmap) {
     doca_error_t result;
 
     result = doca_mmap_dev_add(mmap.mmap, dev);
@@ -89,7 +89,7 @@ DOCADevice::~DOCADevice() {
     }
 }
 
-doca_error_t DOCADeviceRep::OpenWithPci(const DOCADevice& dev, doca_dev_rep_filter filter, const char* pci_addr) {
+doca_error_t DOCADeviceRep::OpenWithPci(DOCADevice& dev, doca_dev_rep_filter filter, const char* pci_addr) {
     uint32_t nb_rdevs = 0;
     struct doca_devinfo_rep** rep_dev_list = NULL;
     uint8_t is_addr_equal = 0;

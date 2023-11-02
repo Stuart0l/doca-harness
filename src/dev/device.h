@@ -21,7 +21,7 @@ class DOCADevice {
     DOCADevice();
     doca_error_t OpenWithPci(const char *pci_addr);
     doca_error_t OpenWithCap(jobs_check func);
-    doca_error_t AddMMap(const MemMap &mmap);
+    doca_error_t AddMMap(MemMap &mmap);
     ~DOCADevice();
 
    protected:
@@ -33,7 +33,7 @@ class DOCADeviceRep {
 
    public:
     DOCADeviceRep();
-    doca_error_t OpenWithPci(const DOCADevice &dev, enum doca_dev_rep_filter filter, const char *pci_addr);
+    doca_error_t OpenWithPci(DOCADevice &dev, enum doca_dev_rep_filter filter, const char *pci_addr);
     ~DOCADeviceRep();
 
    protected:

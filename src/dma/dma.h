@@ -18,7 +18,10 @@ class DOCADma {
     DOCADma(doca_app_mode mode);
     ~DOCADma();
 
-    doca_error_t Init(const MemMap &mmap);
+    doca_error_t Init(MemMap &mmap);
+    doca_error_t InitRemote(MemMap &mmap);
+    doca_error_t ExportDesc(MemMap &mmap, CommChannel &ch);
+    doca_error_t RecvDesc(CommChannel &ch);
 
    protected:
     struct doca_dma *dma_ctx;

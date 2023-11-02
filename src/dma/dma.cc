@@ -9,9 +9,8 @@ namespace doca {
 
 DOCA_LOG_REGISTER(DOCA_DMA);
 
-doca_error_t check_dev_dma_capable(struct doca_devinfo *devinfo)
-{
-	return doca_dma_job_get_supported(devinfo, DOCA_DMA_JOB_MEMCPY);
+doca_error_t check_dev_dma_capable(struct doca_devinfo *devinfo) {
+    return doca_dma_job_get_supported(devinfo, DOCA_DMA_JOB_MEMCPY);
 }
 
 DOCADma::DOCADma(doca_app_mode mode) : mode(mode) {
@@ -51,64 +50,78 @@ DOCADma::DOCADma(doca_app_mode mode) : mode(mode) {
 DOCADma::~DOCADma() {
     doca_error_t result;
 
-	if (mode == DOCA_MODE_DPU) {
-		result = doca_workq_destroy(workq);
-		if (result != DOCA_SUCCESS)
-			DOCA_LOG_ERR("Failed to destroy work queue: %s", doca_get_error_string(result));
-		workq = NULL;
+    if (mode == DOCA_MODE_DPU) {
+        result = doca_workq_destroy(workq);
+        if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to destroy work queue: %s", doca_get_error_string(result));
+        workq = NULL;
 
-		result = doca_dma_destroy(dma_ctx);
-		if (result != DOCA_SUCCESS)
-			DOCA_LOG_ERR("Failed to destroy dma: %s", doca_get_error_string(result));
-		dma_ctx = NULL;
-		ctx = NULL;
+        result = doca_dma_destroy(dma_ctx);
+        if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to destroy dma: %s", doca_get_error_string(result));
+        dma_ctx = NULL;
+        ctx = NULL;
 
-		result = doca_buf_inventory_destroy(buf_inv);
-		if (result != DOCA_SUCCESS)
-			DOCA_LOG_ERR("Failed to destroy buf inventory: %s", doca_get_error_string(result));
-		buf_inv = NULL;
-	}
+        result = doca_buf_inventory_destroy(buf_inv);
+        if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to destroy buf inventory: %s", doca_get_error_string(result));
+        buf_inv = NULL;
+    }
 
     dev.reset();
 }
 
-doca_error_t DOCADma::Init(const MemMap &mmap) {
+doca_error_t DOCADma::Init(MemMap &mmap) {
     doca_error_t result;
 
-	result = dev->AddMMap(mmap);
+    result = dev->AddMMap(mmap);
     if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Unable to add device to mmap: %s", doca_get_error_string(result));
-		return result;
-	}
+        DOCA_LOG_ERR("Unable to add device to mmap: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	if (mode == DOCA_MODE_HOST)
-		return DOCA_SUCCESS;
+    if (mode == DOCA_MODE_HOST) return DOCA_SUCCESS;
 
     result = doca_buf_inventory_start(buf_inv);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Unable to start buffer inventory: %s", doca_get_error_string(result));
-		return result;
-	}
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to start buffer inventory: %s", doca_get_error_string(result));
+        return result;
+    }
 
     result = doca_ctx_dev_add(ctx, dev->dev);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Unable to register device with DMA context: %s", doca_get_error_string(result));
-		return result;
-	}
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to register device with DMA context: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	result = doca_ctx_start(ctx);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Unable to start DMA context: %s", doca_get_error_string(result));
-		return result;
-	}
+    result = doca_ctx_start(ctx);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to start DMA context: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	result = doca_ctx_workq_add(ctx, workq);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Unable to register work queue with context: %s", doca_get_error_string(result));
-		return result;
-	}
+    result = doca_ctx_workq_add(ctx, workq);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to register work queue with context: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	return result;
+    return result;
+}
+
+doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
+    if (mode == DOCA_MODE_DPU) {
+        DOCA_LOG_ERR("DPU should not export memory");
+        return DOCA_SUCCESS;
+    }
+
+    doca_error_t result;
+
+    result = mmap.ExportDPU(*dev);
+    if (result != DOCA_SUCCESS)
+        return result;
+    result = mmap.SendDesc(ch);
+    if (result != DOCA_SUCCESS)
+        return result;
+    result = ch.WaitForSuccessfulMsg();
+    return result;
 }
 
 }  // namespace doca

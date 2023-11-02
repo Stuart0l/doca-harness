@@ -9,12 +9,25 @@ namespace doca {
 
 DOCA_LOG_REGISTER(MEM_REGION);
 
-MemMap::MemMap() {
+MemMap::MemMap() : mode(MMAP_MODE_LOCAL) {
     doca_error_t result;
     result = doca_mmap_create(nullptr, &mmap);
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Unable to create mmap: %s", doca_get_error_string(result));
         throw std::runtime_error("Unable to create mmap");
+    }
+}
+
+MemMap::MemMap(DOCADevice& dev, CommChannel& ch) : mode(MMAP_MODE_REMOTE) {
+    doca_error_t result;
+    result = RecvDesc(ch);
+    if (result != DOCA_SUCCESS)
+        throw std::runtime_error("Failed to receive descriptor");
+    /* Create a local DOCA mmap from export descriptor */
+    result = doca_mmap_create_from_export(NULL, (const void*)export_desc.desc, export_desc.len, dev.dev, &mmap);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Failed to create memory map from export descriptor");
+        throw std::runtime_error("Failed to create memory map from export descriptor");
     }
 }
 
@@ -87,5 +100,7 @@ doca_error_t MemMap::SendDesc(CommChannel& ch) {
 
     return DOCA_SUCCESS;
 }
+
+doca_error_t MemMap::RecvDesc(CommChannel& ch) { return doca_error_t(); }
 
 }  // namespace doca
