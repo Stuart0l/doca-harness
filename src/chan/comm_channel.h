@@ -27,8 +27,10 @@ class CommChannel {
 
     doca_error_t Connect(const char *name);
     doca_error_t DisConnect();
+    doca_error_t Listen(const char *name);
     doca_error_t SendTo(const void *msg, size_t len);
     doca_error RecvFrom(void *msg, size_t *len);
+    doca_error_t SendSuccessfulMsg();
     doca_error_t WaitForSuccessfulMsg();
 
    protected:

@@ -98,6 +98,18 @@ doca_error_t CommChannel::DisConnect() {
     return result;
 }
 
+doca_error_t CommChannel::Listen(const char *name) {
+	doca_error_t result;
+	result = doca_comm_channel_ep_listen(ep, name);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Comm Channel server couldn't start listening: %s", doca_get_error_string(result));
+		return result;
+	}
+
+	DOCA_LOG_INFO("Server started Listening, waiting for new connections");
+	return result;
+}
+
 doca_error_t CommChannel::SendTo(const void *msg, size_t len) {
     struct timespec ts = {
         .tv_nsec = SLEEP_IN_NANOS,
@@ -123,6 +135,21 @@ doca_error CommChannel::RecvFrom(void *msg, size_t *len) {
 
     *len = msg_len;
     return result;
+}
+
+doca_error_t CommChannel::SendSuccessfulMsg() {
+	doca_error_t result;
+	struct cc_msg_status msg_status;
+	size_t msg_len = sizeof(struct cc_msg_status);
+	msg_status.is_success = true;
+
+	result = SendTo(&msg_status, msg_len);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to send status message: %s", doca_get_error_string(result));
+		return result;
+	}
+
+	return DOCA_SUCCESS;
 }
 
 doca_error_t CommChannel::WaitForSuccessfulMsg() {

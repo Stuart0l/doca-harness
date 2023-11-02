@@ -1,6 +1,8 @@
 add_library(doca-harness SHARED)
 
-include_directories(/opt/mellanox/doca/include)
+include_directories(
+    /opt/mellanox/doca/include
+    ${CMAKE_SOURCE_DIR}/src)
 
 if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL x86_64)
     message("Arch: ${CMAKE_HOST_SYSTEM_PROCESSOR}")
@@ -13,12 +15,15 @@ else()
 endif()
 
 target_link_libraries(doca-harness
-    PRIVATE ${DOCA_LIB_PATH}/libdoca_common.so
-    PRIVATE ${DOCA_LIB_PATH}/libdoca_argp.so
-    PRIVATE ${DOCA_LIB_PATH}/libdoca_comm_channel.so
+    PUBLIC ${DOCA_LIB_PATH}/libdoca_common.so
+    PUBLIC ${DOCA_LIB_PATH}/libdoca_argp.so
+    PUBLIC ${DOCA_LIB_PATH}/libdoca_comm_channel.so
+    PUBLIC ${DOCA_LIB_PATH}/libdoca_dma.so
 )
 
 add_subdirectory(chan)
 add_subdirectory(dev)
 add_subdirectory(mem)
 add_subdirectory(dma)
+
+add_subdirectory(app)
