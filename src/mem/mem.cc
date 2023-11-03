@@ -5,6 +5,8 @@
 
 #include <stdexcept>
 
+#include "../dma/dma.h"
+
 namespace doca {
 
 DOCA_LOG_REGISTER(MEM_REGION);
@@ -18,13 +20,12 @@ MemMap::MemMap() : mode(MMAP_MODE_LOCAL) {
     }
 }
 
-MemMap::MemMap(DOCADevice& dev, CommChannel& ch) : mode(MMAP_MODE_REMOTE) {
+MemMap::MemMap(DOCADma& dma, CommChannel& ch) : mode(MMAP_MODE_REMOTE) {
     doca_error_t result;
     result = RecvDesc(ch);
-    if (result != DOCA_SUCCESS)
-        throw std::runtime_error("Failed to receive descriptor");
+    if (result != DOCA_SUCCESS) throw std::runtime_error("Failed to receive descriptor");
     /* Create a local DOCA mmap from export descriptor */
-    result = doca_mmap_create_from_export(NULL, (const void*)export_desc.desc, export_desc.len, dev.dev, &mmap);
+    result = doca_mmap_create_from_export(NULL, (const void*)export_desc.desc, export_desc.len, dma.dev->dev, &mmap);
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Failed to create memory map from export descriptor");
         throw std::runtime_error("Failed to create memory map from export descriptor");
@@ -38,6 +39,8 @@ MemMap::~MemMap() {
         if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to destroy mmap: %s", doca_get_error_string(result));
         mmap = NULL;
     }
+
+    if (buffer && mode == MMAP_MODE_LOCAL) delete buffer;
 }
 
 doca_error_t MemMap::AllocAndPopulate(uint32_t access_flags, size_t buffer_len) {
@@ -104,15 +107,15 @@ doca_error_t MemMap::SendDesc(CommChannel& ch) {
 doca_error_t MemMap::RecvDesc(CommChannel& ch) {
     doca_error_t result;
     size_t msg_len;
-    
+
     msg_len = CC_MAX_MSG_SIZE;
     result = ch.RecvFrom(&export_desc, &msg_len);
 
     if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to receive export descriptor from Host: %s", doca_get_error_string(result));
-		ch.SendFailMsg();
-		return result;
-	}
+        DOCA_LOG_ERR("Failed to receive export descriptor from Host: %s", doca_get_error_string(result));
+        ch.SendFailMsg();
+        return result;
+    }
 
     return result;
 }
@@ -164,7 +167,7 @@ doca_error_t MemMap::RecvAddrAndOffset(CommChannel& ch) {
         ch.SendFailMsg();
         return DOCA_ERROR_INVALID_VALUE;
     }
-    buffer = (char *)received_addr;
+    buffer = (char*)received_addr;
 
     DOCA_DLOG_INFO("Remote address received successfully from Host: %" PRIu64 "", received_addr);
     result = ch.SendSuccessfulMsg();

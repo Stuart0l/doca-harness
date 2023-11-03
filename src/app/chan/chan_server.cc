@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
     result = register_cc_params();
     if (result != DOCA_SUCCESS) {
-        DOCA_LOG_ERR("Failed to register Comm Channel client sample parameters: %s", doca_get_error_string(result));
+        DOCA_LOG_ERR("Failed to register Comm Channel server parameters: %s", doca_get_error_string(result));
         doca_argp_destroy();
         return result;
     }

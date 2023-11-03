@@ -25,7 +25,7 @@ class MemMap {
 
    public:
     MemMap();
-    MemMap(DOCADevice &dev, CommChannel &ch);
+    MemMap(DOCADma &dma, CommChannel &ch);
     ~MemMap();
     doca_error_t AllocAndPopulate(uint32_t access_flags, size_t buffer_len);
     doca_error_t ExportDPU(DOCADevice &dev);

@@ -106,6 +106,22 @@ doca_error_t DOCADma::Init(MemMap &mmap) {
     return result;
 }
 
+void DOCADma::Finalize() {
+    doca_error_t result;
+
+	result = doca_ctx_workq_rm(ctx, workq);
+	if (result != DOCA_SUCCESS)
+		DOCA_LOG_ERR("Failed to remove work queue from ctx: %s", doca_get_error_string(result));
+
+	result = doca_ctx_stop(ctx);
+	if (result != DOCA_SUCCESS)
+		DOCA_LOG_ERR("Unable to stop DMA context: %s", doca_get_error_string(result));
+
+	result = doca_ctx_dev_rm(ctx, dev->dev);
+	if (result != DOCA_SUCCESS)
+		DOCA_LOG_ERR("Failed to remove device from DMA ctx: %s", doca_get_error_string(result));
+}
+
 doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
     if (mode == DOCA_MODE_DPU) {
         DOCA_LOG_ERR("DPU should not export memory");
@@ -140,6 +156,11 @@ doca_error_t DOCADma::AddBuffer(MemMap &local_mmap, MemMap &remote_mmap) {
     }
 
     return result;
+}
+
+void DOCADma::RmBuffer(MemMap &local_mmap, MemMap &remote_mmap) {
+    doca_buf_refcount_rm(local_mmap.doca_buf, NULL);
+    doca_buf_refcount_rm(remote_mmap.doca_buf, NULL);
 }
 
 doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
