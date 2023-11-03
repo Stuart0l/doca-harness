@@ -19,8 +19,9 @@ class DOCADma {
     ~DOCADma();
 
     doca_error_t Init(MemMap &mmap);
-    doca_error_t InitRemote(MemMap &mmap);
     doca_error_t ExportDesc(MemMap &mmap, CommChannel &ch);
+    doca_error_t AddBuffer(MemMap &local_mmap, MemMap &remote_mmap);
+    doca_error_t DmaCopy(MemMap &from, MemMap &to, size_t size);
 
    protected:
     struct doca_dma *dma_ctx;

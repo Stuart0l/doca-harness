@@ -30,7 +30,9 @@ class CommChannel {
     doca_error_t Listen(const char *name);
     doca_error_t SendTo(const void *msg, size_t len);
     doca_error RecvFrom(void *msg, size_t *len);
-    doca_error_t SendSuccessfulMsg();
+    doca_error_t SendStatusMsg(bool is_success);
+    doca_error_t SendSuccessfulMsg() { return SendStatusMsg(true); }
+    doca_error_t SendFailMsg() { return SendStatusMsg(false); }
     doca_error_t WaitForSuccessfulMsg();
 
    protected:

@@ -32,6 +32,9 @@ class MemMap {
     doca_error_t SendDesc(CommChannel &ch);
     doca_error_t RecvDesc(CommChannel &ch);
 
+    doca_error_t SendAddrAndOffset(CommChannel &ch);
+    doca_error_t RecvAddrAndOffset(CommChannel &ch);
+
    protected:
     char *buffer;
     size_t len;

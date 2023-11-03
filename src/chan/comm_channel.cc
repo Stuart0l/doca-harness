@@ -121,7 +121,7 @@ doca_error_t CommChannel::SendTo(const void *msg, size_t len) {
     };
     doca_error_t result;
     while ((result = doca_comm_channel_ep_sendto(ep, msg, len, DOCA_CC_MSG_FLAG_NONE, peer_addr)) == DOCA_ERROR_AGAIN)
-        nanosleep(&ts, &ts);
+        ;// nanosleep(&ts, &ts);
 
     return result;
 }
@@ -134,7 +134,7 @@ doca_error CommChannel::RecvFrom(void *msg, size_t *len) {
     doca_error_t result;
     while ((result = doca_comm_channel_ep_recvfrom(ep, msg, &msg_len, DOCA_CC_MSG_FLAG_NONE, &peer_addr)) ==
            DOCA_ERROR_AGAIN) {
-        nanosleep(&ts, &ts);
+        ;// nanosleep(&ts, &ts);
         msg_len = *len;
     }
 
@@ -142,11 +142,11 @@ doca_error CommChannel::RecvFrom(void *msg, size_t *len) {
     return result;
 }
 
-doca_error_t CommChannel::SendSuccessfulMsg() {
+doca_error_t CommChannel::SendStatusMsg(bool is_success) {
     doca_error_t result;
     struct cc_msg_status msg_status;
     size_t msg_len = sizeof(struct cc_msg_status);
-    msg_status.is_success = true;
+    msg_status.is_success = is_success;
 
     result = SendTo(&msg_status, msg_len);
     if (result != DOCA_SUCCESS) {

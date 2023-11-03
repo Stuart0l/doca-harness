@@ -115,12 +115,72 @@ doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
     doca_error_t result;
 
     result = mmap.ExportDPU(*dev);
-    if (result != DOCA_SUCCESS)
-        return result;
+    if (result != DOCA_SUCCESS) return result;
     result = mmap.SendDesc(ch);
-    if (result != DOCA_SUCCESS)
-        return result;
+    if (result != DOCA_SUCCESS) return result;
     result = ch.WaitForSuccessfulMsg();
+    return result;
+}
+
+doca_error_t DOCADma::AddBuffer(MemMap &local_mmap, MemMap &remote_mmap) {
+    doca_error_t result;
+    /* Construct DOCA buffer for remote (Host) address range */
+    result = doca_buf_inventory_buf_by_addr(buf_inv, remote_mmap.mmap, remote_mmap.buffer, remote_mmap.len,
+                                            &remote_mmap.doca_buf);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to acquire DOCA remote buffer: %s", doca_get_error_string(result));
+        return result;
+    }
+    /* Construct DOCA buffer for local (DPU) address range */
+    result = doca_buf_inventory_buf_by_addr(buf_inv, local_mmap.mmap, local_mmap.buffer, local_mmap.len,
+                                            &local_mmap.doca_buf);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to acquire DOCA local buffer: %s", doca_get_error_string(result));
+        return result;
+    }
+
+    return result;
+}
+
+doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
+    doca_error_t result;
+
+    struct doca_event event = {0};
+    struct doca_dma_job_memcpy dma_job = {0};
+
+    /* Construct DMA job */
+    dma_job.base.type = DOCA_DMA_JOB_MEMCPY;
+    dma_job.base.flags = DOCA_JOB_FLAGS_NONE;
+    dma_job.base.ctx = ctx;
+
+    dma_job.src_buff = from.doca_buf;
+    dma_job.dst_buff = to.doca_buf;
+
+    /* Enqueue DMA job */
+	result = doca_workq_submit(workq, &dma_job.base);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to submit DMA job: %s", doca_get_error_string(result));
+		return result;
+	}
+
+    /* Wait for job completion */
+	while ((result = doca_workq_progress_retrieve(workq, &event, DOCA_WORKQ_RETRIEVE_FLAGS_NONE)) ==
+	       DOCA_ERROR_AGAIN) {
+		;
+	}
+
+    if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to retrieve DMA job: %s", doca_get_error_string(result));
+		return result;
+	}
+
+	/* event result is valid */
+	result = (doca_error_t)event.result.u64;
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("DMA job event returned unsuccessfully: %s", doca_get_error_string(result));
+		return result;
+	}
+
     return result;
 }
 
