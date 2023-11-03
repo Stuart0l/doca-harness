@@ -39,6 +39,7 @@ class CommChannel {
     std::shared_ptr<DOCADevice> dev;
     std::shared_ptr<DOCADeviceRep> dev_rep;
     doca_app_mode mode;
+    bool connected;
 
     doca_error_t set_cc_properties(doca_app_mode mode);
 };

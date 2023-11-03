@@ -11,7 +11,8 @@ namespace doca {
 
 DOCA_LOG_REGISTER(COMM_CHANNEL);
 
-CommChannel::CommChannel(doca_app_mode mode, const char *dev_pci_addr, const char *dev_rep_pci_addr) : mode(mode) {
+CommChannel::CommChannel(doca_app_mode mode, const char *dev_pci_addr, const char *dev_rep_pci_addr)
+    : mode(mode), connected(false) {
     doca_error_t result;
 
     result = doca_comm_channel_ep_create(&ep);
@@ -36,7 +37,7 @@ CommChannel::CommChannel(doca_app_mode mode, const char *dev_pci_addr, const cha
             DOCA_LOG_ERR("Failed to open Comm Channel DOCA device representor based on PCI address");
             doca_comm_channel_ep_destroy(ep);
             dev.reset();
-			throw std::runtime_error("Failed to open Comm Channel DOCA device representor based on PCI address");
+            throw std::runtime_error("Failed to open Comm Channel DOCA device representor based on PCI address");
         }
     }
 
@@ -46,7 +47,7 @@ CommChannel::CommChannel(doca_app_mode mode, const char *dev_pci_addr, const cha
         doca_comm_channel_ep_destroy(ep);
         if (mode == DOCA_MODE_DPU) dev_rep.reset();
         dev.reset();
-		throw std::runtime_error("Failed to set Comm Channel properties");
+        throw std::runtime_error("Failed to set Comm Channel properties");
     }
 }
 
@@ -83,31 +84,35 @@ doca_error_t CommChannel::Connect(const char *name) {
         return result;
     }
 
+    connected = true;
     DOCA_LOG_INFO("Connection to DPU was established successfully");
     return result;
 }
 
 doca_error_t CommChannel::DisConnect() {
+    if (!connected) return DOCA_SUCCESS;
     doca_error_t result;
     if (peer_addr) {
         result = doca_comm_channel_ep_disconnect(ep, peer_addr);
+        if (result == DOCA_ERROR_NOT_CONNECTED) connected = false;
         if (result != DOCA_SUCCESS)
             DOCA_LOG_ERR("Failed to disconnect from Comm Channel peer address: %s", doca_get_error_string(result));
     }
 
+    connected = false;
     return result;
 }
 
 doca_error_t CommChannel::Listen(const char *name) {
-	doca_error_t result;
-	result = doca_comm_channel_ep_listen(ep, name);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Comm Channel server couldn't start listening: %s", doca_get_error_string(result));
-		return result;
-	}
+    doca_error_t result;
+    result = doca_comm_channel_ep_listen(ep, name);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Comm Channel server couldn't start listening: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	DOCA_LOG_INFO("Server started Listening, waiting for new connections");
-	return result;
+    DOCA_LOG_INFO("Server started Listening, waiting for new connections");
+    return result;
 }
 
 doca_error_t CommChannel::SendTo(const void *msg, size_t len) {
@@ -138,18 +143,18 @@ doca_error CommChannel::RecvFrom(void *msg, size_t *len) {
 }
 
 doca_error_t CommChannel::SendSuccessfulMsg() {
-	doca_error_t result;
-	struct cc_msg_status msg_status;
-	size_t msg_len = sizeof(struct cc_msg_status);
-	msg_status.is_success = true;
+    doca_error_t result;
+    struct cc_msg_status msg_status;
+    size_t msg_len = sizeof(struct cc_msg_status);
+    msg_status.is_success = true;
 
-	result = SendTo(&msg_status, msg_len);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to send status message: %s", doca_get_error_string(result));
-		return result;
-	}
+    result = SendTo(&msg_status, msg_len);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Failed to send status message: %s", doca_get_error_string(result));
+        return result;
+    }
 
-	return DOCA_SUCCESS;
+    return DOCA_SUCCESS;
 }
 
 doca_error_t CommChannel::WaitForSuccessfulMsg() {

@@ -16,7 +16,6 @@
 #include <doca_argp.h>
 #include <doca_log.h>
 #include <string.h>
-#include <stdlib.h>
 
 DOCA_LOG_REGISTER(CH_COMMON);
 
@@ -46,10 +45,9 @@ static doca_error_t pci_addr_callback(void *param, void *config) {
 }
 
 doca_error_t msg_size_callback(void *param, void *config) {
-	struct cc_config *cfg = (struct cc_config *)config;
-	const char *msg_size = (char *)param;
-    
-    cfg->cc_msg_size = atoi(msg_size);
+    struct cc_config *cfg = (struct cc_config *)config;
+
+    cfg->cc_msg_size = *(int *)param;
 
     return DOCA_SUCCESS;
 }
@@ -120,7 +118,7 @@ doca_error_t register_cc_params(void) {
         return result;
     }
 
-	/* Create and register Comm Channel message size */
+    /* Create and register Comm Channel message size */
     result = doca_argp_param_create(&msg_size_param);
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Failed to create ARGP param: %s", doca_get_error_string(result));
@@ -128,8 +126,7 @@ doca_error_t register_cc_params(void) {
     }
     doca_argp_param_set_short_name(msg_size_param, "s");
     doca_argp_param_set_long_name(msg_size_param, "msg-size");
-    doca_argp_param_set_description(msg_size_param,
-                                    "DOCA Comm Channel message size");
+    doca_argp_param_set_description(msg_size_param, "DOCA Comm Channel message size");
     doca_argp_param_set_callback(msg_size_param, msg_size_callback);
     doca_argp_param_set_type(msg_size_param, DOCA_ARGP_TYPE_INT);
     result = doca_argp_register_param(msg_size_param);
