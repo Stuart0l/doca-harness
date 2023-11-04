@@ -109,17 +109,14 @@ doca_error_t DOCADma::Init(MemMap &mmap) {
 void DOCADma::Finalize() {
     doca_error_t result;
 
-	result = doca_ctx_workq_rm(ctx, workq);
-	if (result != DOCA_SUCCESS)
-		DOCA_LOG_ERR("Failed to remove work queue from ctx: %s", doca_get_error_string(result));
+    result = doca_ctx_workq_rm(ctx, workq);
+    if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to remove work queue from ctx: %s", doca_get_error_string(result));
 
-	result = doca_ctx_stop(ctx);
-	if (result != DOCA_SUCCESS)
-		DOCA_LOG_ERR("Unable to stop DMA context: %s", doca_get_error_string(result));
+    result = doca_ctx_stop(ctx);
+    if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Unable to stop DMA context: %s", doca_get_error_string(result));
 
-	result = doca_ctx_dev_rm(ctx, dev->dev);
-	if (result != DOCA_SUCCESS)
-		DOCA_LOG_ERR("Failed to remove device from DMA ctx: %s", doca_get_error_string(result));
+    result = doca_ctx_dev_rm(ctx, dev->dev);
+    if (result != DOCA_SUCCESS) DOCA_LOG_ERR("Failed to remove device from DMA ctx: %s", doca_get_error_string(result));
 }
 
 doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
@@ -138,29 +135,22 @@ doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
     return result;
 }
 
-doca_error_t DOCADma::AddBuffer(MemMap &local_mmap, MemMap &remote_mmap) {
+doca_error_t DOCADma::AddBuffer(MemMap &mmap) {
     doca_error_t result;
-    /* Construct DOCA buffer for remote (Host) address range */
-    result = doca_buf_inventory_buf_by_addr(buf_inv, remote_mmap.mmap, remote_mmap.buffer, remote_mmap.len,
-                                            &remote_mmap.doca_buf);
-    if (result != DOCA_SUCCESS) {
-        DOCA_LOG_ERR("Unable to acquire DOCA remote buffer: %s", doca_get_error_string(result));
-        return result;
-    }
     /* Construct DOCA buffer for local (DPU) address range */
-    result = doca_buf_inventory_buf_by_addr(buf_inv, local_mmap.mmap, local_mmap.buffer, local_mmap.len,
-                                            &local_mmap.doca_buf);
+    result = doca_buf_inventory_buf_by_addr(buf_inv, mmap.mmap, mmap.buffer, mmap.len,
+                                            &mmap.doca_buf);
+    DOCA_LOG_INFO("buf %" PRIu64 " len %ld", mmap.buffer, mmap.len);
     if (result != DOCA_SUCCESS) {
-        DOCA_LOG_ERR("Unable to acquire DOCA local buffer: %s", doca_get_error_string(result));
+        DOCA_LOG_ERR("Unable to acquire DOCA buffer: %s", doca_get_error_string(result));
         return result;
     }
 
     return result;
 }
 
-void DOCADma::RmBuffer(MemMap &local_mmap, MemMap &remote_mmap) {
-    doca_buf_refcount_rm(local_mmap.doca_buf, NULL);
-    doca_buf_refcount_rm(remote_mmap.doca_buf, NULL);
+void DOCADma::RmBuffer(MemMap &mmap) {
+    doca_buf_refcount_rm(mmap.doca_buf, NULL);
 }
 
 doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
@@ -171,9 +161,9 @@ doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
     void *data;
 
     struct timespec ts = {
-		.tv_sec = 0,
-		.tv_nsec = 10 * 1000,
-	};
+        .tv_sec = 0,
+        .tv_nsec = 10 * 1000,
+    };
 
     /* Construct DMA job */
     dma_job.base.type = DOCA_DMA_JOB_MEMCPY;
@@ -181,48 +171,47 @@ doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
     dma_job.base.ctx = ctx;
 
     /* Set data position in src_buf */
-	result = doca_buf_get_data(from.doca_buf, &data);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to get data address from DOCA buffer: %s", doca_get_error_string(result));
-		return result;
-	}
-	result = doca_buf_set_data(from.doca_buf, data, size);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to set data for DOCA buffer: %s", doca_get_error_string(result));
-		return result;
-	}
+    result = doca_buf_get_data(from.doca_buf, &data);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Failed to get data address from DOCA buffer: %s", doca_get_error_string(result));
+        return result;
+    }
+    result = doca_buf_set_data(from.doca_buf, data, size);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Failed to set data for DOCA buffer: %s", doca_get_error_string(result));
+        return result;
+    }
 
     dma_job.src_buff = from.doca_buf;
     dma_job.dst_buff = to.doca_buf;
 
     /* Enqueue DMA job */
-	result = doca_workq_submit(workq, &dma_job.base);
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to submit DMA job: %s", doca_get_error_string(result));
-		return result;
-	}
+    result = doca_workq_submit(workq, &dma_job.base);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Failed to submit DMA job: %s", doca_get_error_string(result));
+        return result;
+    }
 
     /* Wait for job completion */
-	while ((result = doca_workq_progress_retrieve(workq, &event, DOCA_WORKQ_RETRIEVE_FLAGS_NONE)) ==
-	       DOCA_ERROR_AGAIN) {
-		nanosleep(&ts, &ts);
-	}
+    while ((result = doca_workq_progress_retrieve(workq, &event, DOCA_WORKQ_RETRIEVE_FLAGS_NONE)) == DOCA_ERROR_AGAIN) {
+        nanosleep(&ts, &ts);
+    }
 
     if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("Failed to retrieve DMA job: %s", doca_get_error_string(result));
+        DOCA_LOG_ERR("Failed to retrieve DMA job: %s", doca_get_error_string(result));
         if (result == DOCA_ERROR_IO_FAILED) {
             struct doca_dma_memcpy_result *memcpy_result = (struct doca_dma_memcpy_result *)&event.result.u64;
             DOCA_LOG_ERR("%d, %s", memcpy_result->result, doca_get_error_string(memcpy_result->result));
         }
-		return result;
-	}
+        return result;
+    }
 
-	/* event result is valid */
-	result = (doca_error_t)event.result.u64;
-	if (result != DOCA_SUCCESS) {
-		DOCA_LOG_ERR("DMA job event returned unsuccessfully: %s", doca_get_error_string(result));
-		return result;
-	}
+    /* event result is valid */
+    result = (doca_error_t)event.result.u64;
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("DMA job event returned unsuccessfully: %s", doca_get_error_string(result));
+        return result;
+    }
 
     return result;
 }

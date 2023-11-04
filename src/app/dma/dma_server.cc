@@ -9,7 +9,7 @@
 #include "dma_common.h"
 
 const char *server_name = "doca_dma_server";
-const int iteration = 100000;
+const int iteration = 10;
 
 DOCA_LOG_REGISTER(DMA_SERVER::MAIN);
 
@@ -59,13 +59,24 @@ int main(int argc, char *argv[]) {
     DOCADma dma(mode);
     MemMap local_mmap;
     
-    local_mmap.AllocAndPopulate(DOCA_ACCESS_LOCAL_READ_WRITE, dma_cfg.chunk_size);
     dma.Init(local_mmap);
+    local_mmap.AllocAndPopulate(DOCA_ACCESS_LOCAL_READ_WRITE, dma_cfg.chunk_size);
 
     MemMap remote_mmap(dma, ch); // <--
     remote_mmap.RecvAddrAndOffset(ch); // <--
 
-    dma.AddBuffer(local_mmap, remote_mmap);
+    result = dma.AddBuffer(local_mmap);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to acquire DOCA local buffer: %s", doca_get_error_string(result));
+		dma.RmBuffer(local_mmap);
+		return result;
+    }
+    dma.AddBuffer(remote_mmap);
+    if (result != DOCA_SUCCESS) {
+        DOCA_LOG_ERR("Unable to acquire DOCA remote buffer: %s", doca_get_error_string(result));
+		dma.RmBuffer(remote_mmap);
+		return result;
+    }
     
     auto start = high_resolution_clock::now();
     decltype(start) end;
@@ -73,7 +84,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < iteration; i++) {
         result = dma.DmaCopy(local_mmap, remote_mmap, dma_cfg.chunk_size);
         if (result != DOCA_SUCCESS) {
-            DOCA_LOG_ERR("Failed to do copy: %s", doca_get_error_string(result));
+            DOCA_LOG_ERR("Failed to do copy on %d: %s", i, doca_get_error_string(result));
         }
     }
 
@@ -84,7 +95,8 @@ int main(int argc, char *argv[]) {
     duration = duration_cast<microseconds>(end - start).count();
     DOCA_LOG_INFO("Throughput: %f MB/s", static_cast<double>(dma_cfg.chunk_size * iteration) / duration);
 
-    dma.RmBuffer(local_mmap, remote_mmap);
+    dma.RmBuffer(local_mmap);
+    dma.RmBuffer(remote_mmap);
     dma.Finalize();
     
     return result;

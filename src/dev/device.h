@@ -24,7 +24,7 @@ class DOCADevice {
     doca_error_t AddMMap(MemMap &mmap);
     ~DOCADevice();
 
-   protected:
+   public:
     struct doca_dev *dev;
 };
 
