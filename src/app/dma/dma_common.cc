@@ -32,6 +32,32 @@ static doca_error_t pci_addr_callback(void *param, void *config) {
     return DOCA_SUCCESS;
 }
 
+/*
+ * ARGP Callback - Handle Comm Channel DOCA device representor PCI address parameter
+ *
+ * @param [in]: Input parameter
+ * @config [in/out]: Program configuration context
+ * @return: DOCA_SUCCESS on success and DOCA_ERROR otherwise
+ */
+static doca_error_t rep_pci_addr_callback(void *param, void *config) {
+    struct dma_copy_cfg *cfg = (struct dma_copy_cfg *)config;
+    const char *rep_pci_addr = (char *)param;
+    int len;
+
+    len = strnlen(rep_pci_addr, DOCA_DEVINFO_PCI_ADDR_SIZE);
+    /* Check using >= to make static code analysis satisfied */
+    if (len >= DOCA_DEVINFO_PCI_ADDR_SIZE) {
+        DOCA_LOG_ERR("Entered device representor PCI address exceeding the maximum size of %d",
+                     DOCA_DEVINFO_PCI_ADDR_SIZE - 1);
+        return DOCA_ERROR_INVALID_VALUE;
+    }
+
+    /* The string will be '\0' terminated due to the strnlen check above */
+    strncpy(cfg->cc_dev_rep_pci_addr, rep_pci_addr, len + 1);
+
+    return DOCA_SUCCESS;
+}
+
 doca_error_t msg_size_callback(void *param, void *config) {
     struct dma_copy_cfg *cfg = (struct dma_copy_cfg *)config;
 
@@ -72,7 +98,7 @@ doca_error_t register_dma_copy_params(void) {
     doca_argp_param_set_long_name(rep_pci_addr_param, "rep-pci");
     doca_argp_param_set_description(rep_pci_addr_param,
                                     "DOCA Comm Channel device representor PCI address (needed only on DPU)");
-    doca_argp_param_set_callback(rep_pci_addr_param, pci_addr_callback);
+    doca_argp_param_set_callback(rep_pci_addr_param, rep_pci_addr_callback);
     doca_argp_param_set_type(rep_pci_addr_param, DOCA_ARGP_TYPE_STRING);
     result = doca_argp_register_param(rep_pci_addr_param);
     if (result != DOCA_SUCCESS) {
