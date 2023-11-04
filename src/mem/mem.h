@@ -14,6 +14,7 @@ class DOCADma;
 
 struct ExportDesc {
     const void *desc;
+    char remote_desc[CC_MAX_MSG_SIZE];
     size_t len;
 };
 

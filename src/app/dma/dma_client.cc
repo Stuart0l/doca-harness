@@ -53,8 +53,8 @@ int main(int argc, char *argv[]) {
     DOCADma dma(mode);
     MemMap mmap;
 
-    mmap.AllocAndPopulate(DOCA_ACCESS_DPU_READ_WRITE, dma_cfg.chunk_size);
     dma.Init(mmap);
+    mmap.AllocAndPopulate(DOCA_ACCESS_DPU_READ_WRITE, dma_cfg.chunk_size);
 
     dma.ExportDesc(mmap, ch);  // -->
     mmap.SendAddrAndOffset(ch);  // -->

@@ -4,6 +4,7 @@
 #include <doca_log.h>
 
 #include <stdexcept>
+#include <string>
 
 #include "../dma/dma.h"
 
@@ -25,7 +26,7 @@ MemMap::MemMap(DOCADma& dma, CommChannel& ch) : mode(MMAP_MODE_REMOTE) {
     result = RecvDesc(ch);
     if (result != DOCA_SUCCESS) throw std::runtime_error("Failed to receive descriptor");
     /* Create a local DOCA mmap from export descriptor */
-    result = doca_mmap_create_from_export(NULL, (const void*)export_desc.desc, export_desc.len, dma.dev->dev, &mmap);
+    result = doca_mmap_create_from_export(NULL, (const void *)export_desc.remote_desc, export_desc.len, dma.dev->dev, &mmap);
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Failed to create memory map from export descriptor");
         throw std::runtime_error("Failed to create memory map from export descriptor");
@@ -54,7 +55,7 @@ doca_error_t MemMap::AllocAndPopulate(uint32_t access_flags, size_t buffer_len) 
 
     buffer = new char[buffer_len];
     len = buffer_len;
-    if (buffer) {
+    if (!buffer) {
         DOCA_LOG_ERR("Failed to allocate memory for source buffer");
         return DOCA_ERROR_NO_MEMORY;
     }
@@ -86,6 +87,8 @@ doca_error_t MemMap::ExportDPU(DOCADevice& dev) {
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Failed to export DOCA mmap: %s", doca_get_error_string(result));
     }
+    std::string desc_str((char *)export_desc.desc, export_desc.len);
+    DOCA_LOG_INFO("%ld %s", export_desc.len, desc_str.c_str());
     return result;
 }
 
@@ -101,6 +104,7 @@ doca_error_t MemMap::SendDesc(CommChannel& ch) {
     result = ch.WaitForSuccessfulMsg();
     if (result != DOCA_SUCCESS) return result;
 
+    DOCA_LOG_INFO("Successfully send desc to DPU");
     return DOCA_SUCCESS;
 }
 
@@ -109,13 +113,16 @@ doca_error_t MemMap::RecvDesc(CommChannel& ch) {
     size_t msg_len;
 
     msg_len = CC_MAX_MSG_SIZE;
-    result = ch.RecvFrom(&export_desc, &msg_len);
+    result = ch.RecvFrom(export_desc.remote_desc, &msg_len);
 
     if (result != DOCA_SUCCESS) {
         DOCA_LOG_ERR("Failed to receive export descriptor from Host: %s", doca_get_error_string(result));
         ch.SendFailMsg();
         return result;
     }
+
+    export_desc.len = msg_len;
+    ch.SendSuccessfulMsg();
 
     return result;
 }
@@ -133,6 +140,8 @@ doca_error_t MemMap::SendAddrAndOffset(CommChannel& ch) {
 
     result = ch.WaitForSuccessfulMsg();
     if (result != DOCA_SUCCESS) return result;
+
+    DOCA_LOG_INFO("Remote address send successfully to DPU: %" PRIu64 "", addr_to_send);
 
     result = ch.SendTo(&len, sizeof(len));
     if (result != DOCA_SUCCESS) {
@@ -169,7 +178,7 @@ doca_error_t MemMap::RecvAddrAndOffset(CommChannel& ch) {
     }
     buffer = (char*)received_addr;
 
-    DOCA_DLOG_INFO("Remote address received successfully from Host: %" PRIu64 "", received_addr);
+    DOCA_LOG_INFO("Remote address received successfully from Host: %" PRIu64 "", received_addr);
     result = ch.SendSuccessfulMsg();
     if (result != DOCA_SUCCESS) return result;
 
@@ -188,7 +197,7 @@ doca_error_t MemMap::RecvAddrAndOffset(CommChannel& ch) {
     }
     len = (size_t)received_addr_len;
 
-    DOCA_DLOG_INFO("Address offset received successfully from Host: %" PRIu64 "", received_addr_len);
+    DOCA_LOG_INFO("Address offset received successfully from Host: %" PRIu64 "", received_addr_len);
 
     result = ch.SendSuccessfulMsg();
     if (result != DOCA_SUCCESS) return result;

@@ -134,7 +134,7 @@ doca_error_t DOCADma::ExportDesc(MemMap &mmap, CommChannel &ch) {
     if (result != DOCA_SUCCESS) return result;
     result = mmap.SendDesc(ch);
     if (result != DOCA_SUCCESS) return result;
-    result = ch.WaitForSuccessfulMsg();
+
     return result;
 }
 
@@ -168,11 +168,29 @@ doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
 
     struct doca_event event = {0};
     struct doca_dma_job_memcpy dma_job = {0};
+    void *data;
+
+    struct timespec ts = {
+		.tv_sec = 0,
+		.tv_nsec = 10 * 1000,
+	};
 
     /* Construct DMA job */
     dma_job.base.type = DOCA_DMA_JOB_MEMCPY;
     dma_job.base.flags = DOCA_JOB_FLAGS_NONE;
     dma_job.base.ctx = ctx;
+
+    /* Set data position in src_buf */
+	result = doca_buf_get_data(from.doca_buf, &data);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to get data address from DOCA buffer: %s", doca_get_error_string(result));
+		return result;
+	}
+	result = doca_buf_set_data(from.doca_buf, data, size);
+	if (result != DOCA_SUCCESS) {
+		DOCA_LOG_ERR("Failed to set data for DOCA buffer: %s", doca_get_error_string(result));
+		return result;
+	}
 
     dma_job.src_buff = from.doca_buf;
     dma_job.dst_buff = to.doca_buf;
@@ -187,11 +205,15 @@ doca_error_t DOCADma::DmaCopy(MemMap &from, MemMap &to, size_t size) {
     /* Wait for job completion */
 	while ((result = doca_workq_progress_retrieve(workq, &event, DOCA_WORKQ_RETRIEVE_FLAGS_NONE)) ==
 	       DOCA_ERROR_AGAIN) {
-		;
+		nanosleep(&ts, &ts);
 	}
 
     if (result != DOCA_SUCCESS) {
 		DOCA_LOG_ERR("Failed to retrieve DMA job: %s", doca_get_error_string(result));
+        if (result == DOCA_ERROR_IO_FAILED) {
+            struct doca_dma_memcpy_result *memcpy_result = (struct doca_dma_memcpy_result *)&event.result.u64;
+            DOCA_LOG_ERR("%d, %s", memcpy_result->result, doca_get_error_string(memcpy_result->result));
+        }
 		return result;
 	}
 
